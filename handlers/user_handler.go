@@ -10,6 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type UserResponse struct {
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
+}
+
 func GetUsers(c *gin.Context) {
 	var users []models.User
 
@@ -18,28 +25,17 @@ func GetUsers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
-}
-
-func CreateUser(c *gin.Context) {
-	var user models.User
-
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON input"})
-		return
+	var response []UserResponse
+	for _, user := range users {
+		response = append(response, UserResponse{
+			ID:    user.ID,
+			Name:  user.Name,
+			Email: user.Email,
+			Phone: user.Phone,
+		})
 	}
 
-	if user.Name == "" || user.Email == "" || user.Phone == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Name, email and phone are required"})
-		return
-	}
-
-	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusOK, response)
 }
 
 func GetUserByID(c *gin.Context) {
@@ -56,5 +52,12 @@ func GetUserByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	response := UserResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+		Phone: user.Phone,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
