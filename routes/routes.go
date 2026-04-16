@@ -8,7 +8,7 @@ import (
 )
 
 func RegisterRoutes(r *gin.Engine) {
-	
+
 	r.POST("/register", handlers.Register)
 	r.POST("/login", handlers.Login)
 
@@ -19,7 +19,7 @@ func RegisterRoutes(r *gin.Engine) {
 	protected := r.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-	
+
 		protected.POST("/items", handlers.CreateItem)
 		protected.PUT("/items/:id", handlers.UpdateItem)
 		protected.DELETE("/items/:id", handlers.DeleteItem)
@@ -28,5 +28,9 @@ func RegisterRoutes(r *gin.Engine) {
 		protected.GET("/users/:id", handlers.GetUserByID)
 
 		protected.POST("/categories", handlers.CreateCategory)
+
+		protected.GET("/items/favorites", handlers.GetFavoriteItems)
+		protected.PUT("/items/favorites/:itemId", handlers.AddItemToFavorites)
+		protected.DELETE("/items/favorites/:itemId", handlers.RemoveItemFromFavorites)
 	}
 }
