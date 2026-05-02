@@ -6,14 +6,15 @@ import (
 
 	"marketplace-api/config"
 	"marketplace-api/models"
+	"marketplace-api/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 func GetItems(c *gin.Context) {
-	var items []models.Item
-
-	if err := config.DB.Preload("User").Preload("Category").Find(&items).Error; err != nil {
+	itemService := services.NewItemService()
+	items, err := itemService.GetItems()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch items"})
 		return
 	}
@@ -29,31 +30,15 @@ func CreateItem(c *gin.Context) {
 		return
 	}
 
-	if item.Title == "" || item.Price <= 0 || item.Location == "" || item.UserID == 0 || item.CategoryID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Title, price, location, user_id and category_id are required",
-		})
+	itemService := services.NewItemService()
+	if err := itemService.CreateItem(&item); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var user models.User
-	if err := config.DB.First(&user, item.UserID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-
-	var category models.Category
-	if err := config.DB.First(&category, item.CategoryID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Category not found"})
-		return
-	}
-
-	if err := config.DB.Create(&item).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create item"})
-		return
-	}
-
-	config.DB.Preload("User").Preload("Category").First(&item, item.ID)
+	// Send notification
+	notificationService := services.NewNotificationService()
+	go notificationService.SendItemCreatedNotification(item.ID, item.Title) // async
 
 	c.JSON(http.StatusCreated, item)
 }
@@ -66,8 +51,9 @@ func GetItemByID(c *gin.Context) {
 		return
 	}
 
-	var item models.Item
-	if err := config.DB.Preload("User").Preload("Category").First(&item, id).Error; err != nil {
+	itemService := services.NewItemService()
+	item, err := itemService.GetItemByID(uint(id))
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
@@ -83,51 +69,20 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
-	var item models.Item
-	if err := config.DB.First(&item, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
-		return
-	}
-
 	var updatedItem models.Item
 	if err := c.ShouldBindJSON(&updatedItem); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON input"})
 		return
 	}
 
-	if updatedItem.Title == "" || updatedItem.Price <= 0 || updatedItem.Location == "" || updatedItem.UserID == 0 || updatedItem.CategoryID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Title, price, location, user_id and category_id are required",
-		})
+	itemService := services.NewItemService()
+	if err := itemService.UpdateItem(uint(id), &updatedItem); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	var user models.User
-	if err := config.DB.First(&user, updatedItem.UserID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-
-	var category models.Category
-	if err := config.DB.First(&category, updatedItem.CategoryID).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Category not found"})
-		return
-	}
-
-	item.Title = updatedItem.Title
-	item.Description = updatedItem.Description
-	item.Price = updatedItem.Price
-	item.Location = updatedItem.Location
-	item.UserID = updatedItem.UserID
-	item.CategoryID = updatedItem.CategoryID
-
-	if err := config.DB.Save(&item).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update item"})
-		return
-	}
-
-	config.DB.Preload("User").Preload("Category").First(&item, item.ID)
-
+	// Reload the item
+	item, _ := itemService.GetItemByID(uint(id))
 	c.JSON(http.StatusOK, item)
 }
 
@@ -139,13 +94,8 @@ func DeleteItem(c *gin.Context) {
 		return
 	}
 
-	var item models.Item
-	if err := config.DB.First(&item, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
-		return
-	}
-
-	if err := config.DB.Delete(&item).Error; err != nil {
+	itemService := services.NewItemService()
+	if err := itemService.DeleteItem(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete item"})
 		return
 	}
